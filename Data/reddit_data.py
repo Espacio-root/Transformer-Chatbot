@@ -28,7 +28,7 @@ class DFUtils:
             return []
         else:
             with open(self.pickle_path, 'rb') as f:
-                return pickle.load(f)
+                return list(pickle.load(f))
             
     def get_pickle_len(self) -> int:
         return len(self.get_pickle())
@@ -55,7 +55,7 @@ class DFUtils:
         with open(self.pickle_path, 'wb') as f:
             pickle.dump(pickle_data, f)
         
-        print(f'{self.time()} Writing {len(post_data)} posts to {self.pickle_path}.pickle with {self.get_pickle_len()} total posts')
+        print(f'{self.time()} Writing {len(post_data)} posts to {self.pickle_path} with {self.get_pickle_len()} total posts')
         
     def update_df_data(self, comment_data: pd.DataFrame) -> None:
         if comment_data.empty:
@@ -65,7 +65,7 @@ class DFUtils:
         df = pd.concat([df, comment_data])
         df.to_csv('data.csv', index=False)
         
-        print(f'{self.time()} Writing {len(comment_data)} comments to {self.df_path}.csv with {self.get_df_len()} total posts')
+        print(f'{self.time()} Writing {len(comment_data)} comments to {self.df_path} with {self.get_df_len()} total posts')
 
 class Scraper(DFUtils):
     
@@ -83,6 +83,7 @@ class Scraper(DFUtils):
                      f'https://www.reddit.com/r/{subreddit}/', f'https://www.reddit.com/r/{subreddit}/top/?t=hour', f'https://www.reddit.com/r/{subreddit}/top/?t=day', 
                      f'https://www.reddit.com/r/{subreddit}/top/?t=week', f'https://www.reddit.com/r/{subreddit}/top/?t=month', f'https://www.reddit.com/r/{subreddit}/top/?t=year', 
                      f'https://www.reddit.com/r/{subreddit}/top/?t=all']
+        # self.urls = [f'https://www.reddit.com/r/{subreddit}/new/']
         self.s = requests.Session()
         
     def get_posts(self) -> list:
@@ -100,28 +101,27 @@ class Scraper(DFUtils):
                     self.err = 0
                     if self.persist_index:
                         open('cur_div.txt', 'w').write(str(self.cur_div))
-                try:
-                    promoted = post.find_element(By.XPATH, './/div/div/div/div[3]/div/div[1]/div/div[1]/span[2]/span')
-                except:
-                    promoted = False
-                if promoted != False:
+                post = lh.fromstring(post.get_attribute('outerHTML'))
+                promoted = post.xpath('.//div/div/div/div[3]/div/div[1]/div/div[1]/span[2]/span')
+                if len(promoted) != 0:
                     continue
-                post_time = post.find_element(By.XPATH, './/div/div/div[3]/div[1]/div/div[1]/span[2]').text
-                post_time = Scraper.get_time_ago(post_time)
+                # post_time = post.find_element(By.XPATH, './/div/div/div[3]/div[1]/div/div[1]/span[2]').text
+                # post_time = Scraper.get_time_ago(post_time)
                 # if post_time > self.buffer:
                 #     continue
                 
-                post_title = post.find_element(By.XPATH, './/div/div/div[3]/div[2]/div[1]/a/div/h3').text
-                comments_url = post.find_element(By.XPATH, './/div/div/div[3]/div[2]/div[1]/a').get_attribute('href')
+                post_title = post.xpath('.//div/div/div[3]/div[2]/div[1]/a/div/h3/text()')[0]
+                comments_url = post.xpath('.//div/div/div[3]/div[2]/div[1]/a/@href')[0]
                 comments_url = comments_url.split('comments/')[-1] # https://www.reddit.com/r/AskReddit/comments/13ol3cg/whats_something_that_you_wish_you_could_enjoy/
                 
-                cur_items = self.get_df_items('comments_url')
+                cur_items = self.get_pickle()
                 if comments_url in cur_items:
                     continue
                 
-                post_data.append((post_title, comments_url, None, None))
-            except:
+                post_data.append(comments_url)
+            except Exception as e:
                 continue
+        
         return post_data
             
     def get_comments(self, link, max_comments=10) -> pd.DataFrame:
@@ -173,6 +173,7 @@ class Scraper(DFUtils):
         return df
 
     def post_main(self) -> None:
+        driver.get(random.choice(self.urls))
         
         while self.get_pickle_len() < self.limit:
             posts = self.get_posts()
@@ -189,8 +190,9 @@ class Scraper(DFUtils):
             
     def comment_main(self) -> None:
         for link in self.get_pickle():
-            df = self.get_comments(link)
-            self.update_df_data(df)
+            if link not in self.get_df_items('comments_url'):
+                df = self.get_comments(link)
+                self.update_df_data(df)
 
             # time.sleep(0.5)
             
@@ -241,4 +243,4 @@ class Scraper(DFUtils):
     
 if __name__ == '__main__':
     scraper = Scraper('AskReddit', limit=20000)
-    scraper.main()
+    scraper.post_main()

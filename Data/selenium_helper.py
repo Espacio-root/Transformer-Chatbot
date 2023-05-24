@@ -25,9 +25,11 @@ class helper:
         self.driver = webdriver.Chrome(service=Service(r'C:/Users/Rizwan/OneDrive/Desktop/chromedriver.exe'), options=options)
         self.KEYS = Keys
     
-    def locate(self, path, wait_time=10, group=False, exception=True):
+    def locate(self, path, wait_time=10, group=False, exception=True, parent=None):
+        if not parent:
+            parent = self.driver
         try:
-            element = WebDriverWait(self.driver, wait_time).until(EC.presence_of_element_located((By.XPATH, path)))
+            element = WebDriverWait(parent, wait_time).until(EC.presence_of_element_located((By.XPATH, path)))
             if group:
                 return element.find_elements(By.XPATH, path)
             else:
