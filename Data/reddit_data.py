@@ -9,17 +9,15 @@ import random
 import threading
 from datetime import datetime
 from retrying import retry
-from selenium_helper import helper
+from Data.selenium_helper import helper
 from selenium.webdriver.common.by import By
-
-helper = helper(True)
-driver = helper.driver
 
 class DFUtils:
     
     def __init__(self) -> None:
-        self.pickle_path = 'urls.pickle'
-        self.df_path = 'data.csv'
+        self.cur_dir = os.path.dirname(os.path.realpath(__file__))
+        self.pickle_path = fr'{self.cur_dir}\urls.pickle'
+        self.df_path = fr'{self.cur_dir}\data.csv'
         self.df_cols = ['post_time', 'title', 'comments', 'nsfw', 'comments_url']
         self.time = lambda: datetime.now().strftime("%H:%M:%S")
         
@@ -37,7 +35,7 @@ class DFUtils:
         if not os.path.exists(self.df_path):
             return pd.DataFrame(columns=self.df_cols)
         else:
-            return pd.read_csv('data.csv')
+            return pd.read_csv(self.df_path)
         
     def get_df_items(self, column) -> list:
         return self.get_df()[column].tolist()
@@ -242,5 +240,7 @@ class Scraper(DFUtils):
         return str(current_time - time_difference)
     
 if __name__ == '__main__':
+    helper = helper(True)
+    driver = helper.driver
     scraper = Scraper('AskReddit', limit=20000)
     scraper.post_main()
